@@ -29,8 +29,8 @@ export default function LoginPage() {
   return (
     <AuthShell
       title="Sign in"
-      subtitle="A calm, responsive workspace for one-to-one conversations with live presence and message history."
-      supportingText="Use your email and password to reconnect with your conversations."
+      subtitle="Stay close. Chat fast."
+      supportingText="Continue to your conversations."
       footerText="Create one"
       footerLink="/register"
       footerLabel="Need an account?"

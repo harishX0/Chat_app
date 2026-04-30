@@ -33,8 +33,8 @@ export default function RegisterPage() {
   return (
     <AuthShell
       title="Create account"
-      subtitle="Jump into a full-stack MERN chat app with real-time Socket.io messaging, timestamps, and presence."
-      supportingText="Create your profile once, then chat live from any device with your saved history."
+      subtitle="Start a private space."
+      supportingText="Create your profile."
       footerText="Sign in"
       footerLink="/login"
       footerLabel="Already have an account?"

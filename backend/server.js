@@ -20,26 +20,47 @@ const app = express();
 const server = http.createServer(app);
 
 const onlineUsers = new Map();
-const allowedOrigins = (process.env.CLIENT_URL || "http://localhost:5173")
+const configuredOrigins = (process.env.CLIENT_URL || "http://localhost:5173")
   .split(",")
-  .map((origin) => origin.trim());
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+const isLoopbackOrigin = (origin) => {
+  try {
+    const { hostname, protocol } = new URL(origin);
+    return protocol === "http:" && ["localhost", "127.0.0.1", "::1"].includes(hostname);
+  } catch (error) {
+    return false;
+  }
+};
+
+const isAllowedOrigin = (origin) => !origin || configuredOrigins.includes(origin) || isLoopbackOrigin(origin);
+
+const corsOptions = {
+  origin(origin, callback) {
+    if (isAllowedOrigin(origin)) {
+      callback(null, true);
+      return;
+    }
+
+    callback(new Error(`CORS blocked origin: ${origin}`));
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PATCH", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+};
 
 const io = new Server(server, {
   cors: {
-    origin: allowedOrigins,
-    methods: ["GET", "POST", "PATCH"],
+    ...corsOptions,
+    methods: ["GET", "POST"],
   },
 });
 
 app.set("io", io);
 app.set("onlineUsers", onlineUsers);
 
-app.use(
-  cors({
-    origin: allowedOrigins,
-    credentials: true,
-  })
-);
+app.use(cors(corsOptions));
 app.use(express.json());
 
 app.get("/api/health", (req, res) => {
