@@ -22,7 +22,7 @@ const server = http.createServer(app);
 const onlineUsers = new Map();
 const configuredOrigins = (process.env.CLIENT_URL || "http://localhost:5173")
   .split(",")
-  .map((origin) => origin.trim())
+  .map((origin) => origin.trim().replace(/\/$/, ""))
   .filter(Boolean);
 
 const isLoopbackOrigin = (origin) => {
