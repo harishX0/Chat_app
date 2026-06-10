@@ -1,5 +1,4 @@
 const http = require("http");
-
 const cors = require("cors");
 const dotenv = require("dotenv");
 const express = require("express");
@@ -8,7 +7,11 @@ const mongoose = require("mongoose");
 const { Server } = require("socket.io");
 
 const connectDB = require("./config/db");
-const { markConversationAsSeen, storeMessage } = require("./controllers/messageController");
+const {
+  markConversationAsSeen,
+  storeMessage,
+} = require("./controllers/messageController");
+
 const authRoutes = require("./routes/authRoutes");
 const messageRoutes = require("./routes/messageRoutes");
 const userRoutes = require("./routes/userRoutes");
@@ -20,6 +23,7 @@ const app = express();
 const server = http.createServer(app);
 
 const onlineUsers = new Map();
+
 const configuredOrigins = (process.env.CLIENT_URL || "http://localhost:5173")
   .split(",")
   .map((origin) => origin.trim().replace(/\/$/, ""))
@@ -27,26 +31,30 @@ const configuredOrigins = (process.env.CLIENT_URL || "http://localhost:5173")
 
 const corsOptions = {
   origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
 
-    if (configuredOrigins.indexOf(origin) !== -1 || ["localhost", "127.0.0.1", "::1"].some(h => origin.includes(h))) {
-      callback(null, true);
-    } else {
-      callback(new Error(`CORS blocked origin: ${origin}`));
+    const cleanOrigin = origin.replace(/\/$/, "");
+
+    if (
+      configuredOrigins.includes(cleanOrigin) ||
+      ["localhost", "127.0.0.1", "::1"].some((h) => cleanOrigin.includes(h))
+    ) {
+      return callback(null, true);
     }
+
+    return callback(new Error(`CORS blocked origin: ${origin}`));
   },
   credentials: true,
   methods: ["GET", "POST", "PATCH", "OPTIONS", "DELETE", "PUT"],
   allowedHeaders: ["Content-Type", "Authorization"],
 };
 
-app.use(cors(corsOptions));
-app.options("*", cors(corsOptions)); // Enable pre-flight for all routes
-
+const io = new Server(server, {
   cors: {
-    ...corsOptions,
-    methods: ["GET", "POST"],
+    origin: corsOptions.origin,
+    credentials: true,
+    methods: ["GET", "POST", "PATCH", "OPTIONS", "DELETE", "PUT"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   },
 });
 
@@ -54,7 +62,12 @@ app.set("io", io);
 app.set("onlineUsers", onlineUsers);
 
 app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));
 app.use(express.json());
+
+app.get("/", (req, res) => {
+  res.send("Backend is running");
+});
 
 app.get("/api/health", (req, res) => {
   const dbStates = ["disconnected", "connected", "connecting", "disconnecting"];
@@ -127,39 +140,38 @@ io.on("connection", (socket) => {
   });
 
   socket.on("typingStart", ({ receiverId } = {}) => {
-    if (!receiverId) {
-      return;
-    }
+    if (!receiverId) return;
 
     io.to(receiverId).emit("typingStart", { senderId: socket.userId });
   });
 
   socket.on("typingStop", ({ receiverId } = {}) => {
-    if (!receiverId) {
-      return;
-    }
+    if (!receiverId) return;
 
     io.to(receiverId).emit("typingStop", { senderId: socket.userId });
   });
 
-  socket.on("messageSeen", async ({ conversationUserId } = {}, callback = () => {}) => {
-    try {
-      if (!conversationUserId) {
-        callback({ updated: 0 });
-        return;
+  socket.on(
+    "messageSeen",
+    async ({ conversationUserId } = {}, callback = () => {}) => {
+      try {
+        if (!conversationUserId) {
+          callback({ updated: 0 });
+          return;
+        }
+
+        const payload = await markConversationAsSeen({
+          senderId: conversationUserId,
+          receiverId: socket.userId,
+          io,
+        });
+
+        callback({ updated: payload ? payload.messageIds.length : 0 });
+      } catch (error) {
+        callback({ error: error.message || "Unable to update message status." });
       }
-
-      const payload = await markConversationAsSeen({
-        senderId: conversationUserId,
-        receiverId: socket.userId,
-        io,
-      });
-
-      callback({ updated: payload ? payload.messageIds.length : 0 });
-    } catch (error) {
-      callback({ error: error.message || "Unable to update message status." });
     }
-  });
+  );
 
   socket.on("disconnect", () => {
     const remainingConnections = (onlineUsers.get(socket.userId) || 1) - 1;
