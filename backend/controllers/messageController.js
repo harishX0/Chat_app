@@ -3,14 +3,16 @@ const mongoose = require("mongoose");
 const Message = require("../models/Message");
 const serializeMessage = require("../utils/serializeMessage");
 
-const storeMessage = async ({ senderId, receiverId, message, onlineUsers, io }) => {
+const storeMessage = async ({ senderId, receiverId, message, image, replyTo, onlineUsers, io }) => {
   const normalizedReceiverId = receiverId.toString();
   const isReceiverOnline = Boolean(onlineUsers?.has(normalizedReceiverId));
 
   const savedMessage = await Message.create({
     senderId,
     receiverId,
-    message: message.trim(),
+    message: message?.trim(),
+    image,
+    replyTo,
     status: isReceiverOnline ? "delivered" : "sent",
   });
 
@@ -84,10 +86,10 @@ const getConversation = async (req, res) => {
 
 const sendMessage = async (req, res) => {
   try {
-    const { receiverId, message } = req.body;
+    const { receiverId, message, image, replyTo } = req.body;
 
-    if (!receiverId || !message) {
-      return res.status(400).json({ message: "Receiver and message are required." });
+    if (!receiverId || (!message && !image)) {
+      return res.status(400).json({ message: "Receiver and either message or image are required." });
     }
 
     if (!mongoose.isValidObjectId(receiverId)) {
@@ -98,6 +100,8 @@ const sendMessage = async (req, res) => {
       senderId: req.user.userId,
       receiverId,
       message,
+      image,
+      replyTo,
       onlineUsers: req.app.get("onlineUsers"),
       io: req.app.get("io"),
     });
@@ -131,10 +135,74 @@ const markMessagesSeen = async (req, res) => {
   }
 };
 
+const reactToMessage = async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const { emoji } = req.body;
+    const userId = req.user.userId;
+
+    const message = await Message.findById(messageId);
+    if (!message) return res.status(404).json({ message: "Message not found" });
+
+    message.reactions = message.reactions.filter((r) => r.userId.toString() !== userId);
+
+    if (emoji) {
+      message.reactions.push({ userId, emoji });
+    }
+
+    await message.save();
+    const serialized = serializeMessage(message);
+
+    const io = req.app.get("io");
+    if (io) {
+      io.to(message.senderId.toString()).emit("messageReaction", { messageId, reactions: serialized.reactions });
+      io.to(message.receiverId.toString()).emit("messageReaction", { messageId, reactions: serialized.reactions });
+    }
+
+    return res.status(200).json({ reactions: serialized.reactions });
+  } catch (error) {
+    return res.status(500).json({ message: "Unable to react to message.", error: error.message });
+  }
+};
+
+const unsendMessage = async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const userId = req.user.userId;
+
+    const message = await Message.findById(messageId);
+    if (!message) return res.status(404).json({ message: "Message not found" });
+
+    if (message.senderId.toString() !== userId) {
+      return res.status(403).json({ message: "You can only unsend your own messages." });
+    }
+
+    message.isDeleted = true;
+    message.message = "This message was unsent";
+    message.image = null;
+    message.reactions = [];
+
+    await message.save();
+
+    const io = req.app.get("io");
+    if (io) {
+      const payload = { messageId, isDeleted: true };
+      io.to(message.senderId.toString()).emit("messageDeleted", payload);
+      io.to(message.receiverId.toString()).emit("messageDeleted", payload);
+    }
+
+    return res.status(200).json({ message: "Message unsent" });
+  } catch (error) {
+    return res.status(500).json({ message: "Unable to unsend message.", error: error.message });
+  }
+};
+
 module.exports = {
   getConversation,
   sendMessage,
   markMessagesSeen,
   markConversationAsSeen,
   storeMessage,
+  reactToMessage,
+  unsendMessage,
 };

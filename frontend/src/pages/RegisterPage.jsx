@@ -24,7 +24,7 @@ export default function RegisterPage() {
       await register(formData);
       navigate("/", { replace: true });
     } catch (requestError) {
-      setError(requestError.response?.data?.message || "Unable to create your account.");
+      setError(requestError.response?.data?.message || "Sorry for the inconvenience,server is down.");
     } finally {
       setSubmitting(false);
     }

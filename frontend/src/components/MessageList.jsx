@@ -1,4 +1,4 @@
-import { Check, CheckCheck } from "lucide-react";
+import { Check, CheckCheck, Reply, Trash2, Heart } from "lucide-react";
 import { useEffect, useRef } from "react";
 
 const formatTime = (value) =>
@@ -31,12 +31,31 @@ const renderStatus = (status) => {
   );
 };
 
-export default function MessageList({ currentUserId, messages, loading, selectedUser, typingUser }) {
+export default function MessageList({
+  currentUserId,
+  messages,
+  loading,
+  selectedUser,
+  typingUser,
+  onReply,
+  onReact,
+  onUnsend,
+}) {
   const bottomRef = useRef(null);
+  const lastTap = useRef(0);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, typingUser]);
+
+  const handleDoubleTap = (messageId) => {
+    const now = Date.now();
+    const DOUBLE_TAP_DELAY = 300;
+    if (now - lastTap.current < DOUBLE_TAP_DELAY) {
+      onReact(messageId, "❤️");
+    }
+    lastTap.current = now;
+  };
 
   if (!selectedUser) {
     return (
@@ -56,19 +75,56 @@ export default function MessageList({ currentUserId, messages, loading, selected
       {messages.length ? (
         messages.map((message, index) => {
           const isOwnMessage = message.senderId === currentUserId;
+          const repliedMessage = message.replyTo
+            ? messages.find((m) => m._id === message.replyTo)
+            : null;
 
           return (
             <div
               key={message._id}
-              className={`message-row ${isOwnMessage ? "is-own" : ""} ${message.error ? "has-error" : ""}`}
+              className={`message-row ${isOwnMessage ? "is-own" : ""} ${
+                message.error ? "has-error" : ""
+              } ${message.isDeleted ? "is-deleted" : ""}`}
               style={{ "--message-index": Math.min(index, 8) }}
+              onClick={() => handleDoubleTap(message._id)}
             >
               <article className="message-bubble">
+                {repliedMessage && !message.isDeleted && (
+                  <div className="reply-context">
+                    <p className="reply-user">Replying to {repliedMessage.senderId === currentUserId ? "yourself" : selectedUser.name}</p>
+                    <p className="reply-text">{repliedMessage.message || "Image"}</p>
+                  </div>
+                )}
+                
+                {message.image && !message.isDeleted && (
+                  <div className="message-image">
+                    <img src={message.image} alt="Sent" />
+                  </div>
+                )}
+
                 <p>{message.message}</p>
+                
+                {!message.isDeleted && (
+                  <div className="message-actions">
+                    <button onClick={() => onReply(message)} title="Reply"><Reply size={14} /></button>
+                    {isOwnMessage && (
+                      <button onClick={() => onUnsend(message._id)} title="Unsend"><Trash2 size={14} /></button>
+                    )}
+                  </div>
+                )}
+
                 <footer>
                   <time>{formatTime(message.timestamp || message.createdAt)}</time>
                   {isOwnMessage ? renderStatus(message.status) : null}
                 </footer>
+
+                {message.reactions && message.reactions.length > 0 && (
+                  <div className="message-reactions">
+                    {message.reactions.map((r, i) => (
+                      <span key={i} className="reaction-badge">{r.emoji}</span>
+                    ))}
+                  </div>
+                )}
               </article>
             </div>
           );

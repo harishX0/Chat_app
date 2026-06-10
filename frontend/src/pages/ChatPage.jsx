@@ -40,6 +40,8 @@ export default function ChatPage() {
   const [pageError, setPageError] = useState("");
   const [typingUser, setTypingUser] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [replyingTo, setReplyingTo] = useState(null);
+  const [selectedImage, setSelectedImage] = useState(null);
   const typingTimeoutRef = useRef(null);
   const isTypingRef = useRef(false);
 
@@ -186,11 +188,29 @@ export default function ChatPage() {
       }
     };
 
+    const handleMessageReaction = ({ messageId, reactions }) => {
+      setMessages((currentMessages) =>
+        currentMessages.map((msg) => (msg._id === messageId ? { ...msg, reactions } : msg))
+      );
+    };
+
+    const handleMessageDeleted = ({ messageId, isDeleted }) => {
+      setMessages((currentMessages) =>
+        currentMessages.map((msg) =>
+          msg._id === messageId
+            ? { ...msg, isDeleted, message: "This message was unsent", image: null, reactions: [] }
+            : msg
+        )
+      );
+    };
+
     socket.on("receiveMessage", handleReceiveMessage);
     socket.on("messageSent", handleMessageSent);
     socket.on("messageSeen", handleMessageSeen);
     socket.on("typingStart", handleTypingStart);
     socket.on("typingStop", handleTypingStop);
+    socket.on("messageReaction", handleMessageReaction);
+    socket.on("messageDeleted", handleMessageDeleted);
 
     return () => {
       socket.off("receiveMessage", handleReceiveMessage);
@@ -198,6 +218,8 @@ export default function ChatPage() {
       socket.off("messageSeen", handleMessageSeen);
       socket.off("typingStart", handleTypingStart);
       socket.off("typingStop", handleTypingStop);
+      socket.off("messageReaction", handleMessageReaction);
+      socket.off("messageDeleted", handleMessageDeleted);
     };
   }, [activeChatId, socket, user]);
 
@@ -249,7 +271,7 @@ export default function ChatPage() {
   const handleSendMessage = () => {
     const trimmedMessage = draft.trim();
 
-    if (!trimmedMessage || !socket || !selectedUser || !user) {
+    if ((!trimmedMessage && !selectedImage) || !socket || !selectedUser || !user) {
       return;
     }
 
@@ -259,12 +281,16 @@ export default function ChatPage() {
       senderId: user._id,
       receiverId: selectedUser._id,
       message: trimmedMessage,
+      image: selectedImage,
+      replyTo: replyingTo?._id || null,
       status: onlineUsers.includes(selectedUser._id) ? "delivered" : "sent",
       timestamp: new Date().toISOString(),
     };
 
     setMessages((currentMessages) => [...currentMessages, optimisticMessage]);
     setDraft("");
+    setSelectedImage(null);
+    setReplyingTo(null);
     setTypingUser(false);
 
     if (isTypingRef.current) {
@@ -272,17 +298,27 @@ export default function ChatPage() {
       isTypingRef.current = false;
     }
 
-    socket.emit("sendMessage", { receiverId: selectedUser._id, message: trimmedMessage, tempId }, (response) => {
-      if (!response?.error) {
-        return;
-      }
+    socket.emit(
+      "sendMessage",
+      {
+        receiverId: selectedUser._id,
+        message: trimmedMessage,
+        image: selectedImage,
+        replyTo: replyingTo?._id || null,
+        tempId,
+      },
+      (response) => {
+        if (!response?.error) {
+          return;
+        }
 
-      setMessages((currentMessages) =>
-        currentMessages.map((message) =>
-          message._id === tempId ? { ...message, error: true, status: "sent" } : message
-        )
-      );
-    });
+        setMessages((currentMessages) =>
+          currentMessages.map((message) =>
+            message._id === tempId ? { ...message, error: true, status: "sent" } : message
+          )
+        );
+      }
+    );
   };
 
   if (loadingUsers) {
@@ -354,9 +390,32 @@ export default function ChatPage() {
               loading={loadingMessages}
               selectedUser={selectedUser}
               typingUser={typingUser}
+              onReply={setReplyingTo}
+              onReact={async (messageId, emoji) => {
+                try {
+                  await messageService.reactToMessage(messageId, emoji);
+                } catch (err) {
+                  console.error("Failed to react", err);
+                }
+              }}
+              onUnsend={async (messageId) => {
+                try {
+                  await messageService.unsendMessage(messageId);
+                } catch (err) {
+                  console.error("Failed to unsend", err);
+                }
+              }}
             />
 
-            <MessageComposer value={draft} onChange={updateTypingState} onSend={handleSendMessage} />
+            <MessageComposer
+              value={draft}
+              onChange={updateTypingState}
+              onSend={handleSendMessage}
+              replyingTo={replyingTo}
+              onCancelReply={() => setReplyingTo(null)}
+              onImageSelect={setSelectedImage}
+              selectedImage={selectedImage}
+            />
           </>
         ) : (
           <div className="conversation-placeholder">

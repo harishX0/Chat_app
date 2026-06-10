@@ -115,10 +115,10 @@ io.on("connection", (socket) => {
 
   socket.on("sendMessage", async (payload = {}, callback = () => {}) => {
     try {
-      const { receiverId, message, tempId } = payload;
+      const { receiverId, message, image, replyTo, tempId } = payload;
 
-      if (!receiverId || !message || !message.trim()) {
-        callback({ error: "Receiver and message are required." });
+      if (!receiverId || (!message && !image)) {
+        callback({ error: "Receiver and message/image are required." });
         return;
       }
 
@@ -126,6 +126,8 @@ io.on("connection", (socket) => {
         senderId: socket.userId,
         receiverId,
         message,
+        image,
+        replyTo,
         onlineUsers,
         io,
       });
