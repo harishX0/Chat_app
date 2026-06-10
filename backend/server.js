@@ -25,32 +25,25 @@ const configuredOrigins = (process.env.CLIENT_URL || "http://localhost:5173")
   .map((origin) => origin.trim().replace(/\/$/, ""))
   .filter(Boolean);
 
-const isLoopbackOrigin = (origin) => {
-  try {
-    const { hostname, protocol } = new URL(origin);
-    return protocol === "http:" && ["localhost", "127.0.0.1", "::1"].includes(hostname);
-  } catch (error) {
-    return false;
-  }
-};
-
-const isAllowedOrigin = (origin) => !origin || configuredOrigins.includes(origin) || isLoopbackOrigin(origin);
-
 const corsOptions = {
-  origin(origin, callback) {
-    if (isAllowedOrigin(origin)) {
-      callback(null, true);
-      return;
-    }
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
 
-    callback(new Error(`CORS blocked origin: ${origin}`));
+    if (configuredOrigins.indexOf(origin) !== -1 || ["localhost", "127.0.0.1", "::1"].some(h => origin.includes(h))) {
+      callback(null, true);
+    } else {
+      callback(new Error(`CORS blocked origin: ${origin}`));
+    }
   },
   credentials: true,
-  methods: ["GET", "POST", "PATCH", "OPTIONS"],
+  methods: ["GET", "POST", "PATCH", "OPTIONS", "DELETE", "PUT"],
   allowedHeaders: ["Content-Type", "Authorization"],
 };
 
-const io = new Server(server, {
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions)); // Enable pre-flight for all routes
+
   cors: {
     ...corsOptions,
     methods: ["GET", "POST"],
