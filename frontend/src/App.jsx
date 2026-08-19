@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import PrivateRoute from "./components/PrivateRoute";
 import { useAuth } from "./context/AuthContext";
 import ChatPage from "./pages/ChatPage";
+import FeedPage from "./pages/FeedPage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 
@@ -21,6 +22,8 @@ const PublicRoute = ({ children }) => {
 };
 
 export default function App() {
+  const { user } = useAuth();
+
   return (
     <Routes>
       <Route
@@ -47,8 +50,15 @@ export default function App() {
           </PrivateRoute>
         }
       />
+      <Route
+        path="/feed"
+        element={
+          <PrivateRoute>
+            <FeedPage currentUser={user} />
+          </PrivateRoute>
+        }
+      />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }
-

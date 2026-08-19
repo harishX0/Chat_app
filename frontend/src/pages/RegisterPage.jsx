@@ -9,6 +9,7 @@ export default function RegisterPage() {
   const { register } = useAuth();
   const [formData, setFormData] = useState({
     name: "",
+    username: "",
     email: "",
     password: "",
   });
@@ -48,6 +49,18 @@ export default function RegisterPage() {
             value={formData.name}
             onChange={(event) => setFormData((current) => ({ ...current, name: event.target.value }))}
             required
+          />
+        </label>
+
+        <label>
+          <span>Username</span>
+          <input
+            type="text"
+            placeholder="Choose a unique username"
+            value={formData.username}
+            onChange={(event) => setFormData((current) => ({ ...current, username: event.target.value.toLowerCase().replace(/\s/g, '') }))}
+            required
+            minLength={3}
           />
         </label>
 

@@ -8,6 +8,14 @@ const userSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    username: {
+      type: String,
+      required: true,
+      unique: true,
+      lowercase: true,
+      trim: true,
+      minlength: 3,
+    },
     email: {
       type: String,
       required: true,
@@ -21,6 +29,24 @@ const userSchema = new mongoose.Schema(
       minlength: 6,
       select: false,
     },
+    friends: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
+    friendRequests: [
+      {
+        user: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+        },
+        status: {
+          type: String,
+          enum: ["pending", "received"], // pending = sent by me, received = sent to me
+        },
+      },
+    ],
   },
   {
     timestamps: true,

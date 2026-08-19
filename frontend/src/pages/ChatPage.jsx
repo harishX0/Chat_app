@@ -246,7 +246,7 @@ export default function ChatPage() {
 
     if (!socket || !activeChatId) {
       return;
-    }
+  }
 
     if (value.trim()) {
       if (!isTypingRef.current) {
@@ -346,12 +346,12 @@ export default function ChatPage() {
             <header className="conversation-header">
               <div className="conversation-heading">
                 <button
-                  aria-label="Open chats"
-                  className="ghost-button mobile-back"
-                  onClick={() => setMobileOpen(true)}
+                  aria-label="Back to list"
+                  className="ghost-button mobile-only mobile-back-btn"
+                  onClick={() => setActiveChatId("")}
                   type="button"
                 >
-                  <ArrowLeft size={18} />
+                  <ArrowLeft size={20} />
                 </button>
 
                 <div className="avatar large">{selectedUser.name.charAt(0)}</div>
@@ -419,8 +419,15 @@ export default function ChatPage() {
           </>
         ) : (
           <div className="conversation-placeholder">
-            <h3>No teammates yet</h3>
-            <p>Register a second account and the conversation list will light up here.</p>
+            <button
+              className="mobile-menu-button mobile-only"
+              onClick={() => setMobileOpen(true)}
+              style={{ marginBottom: '1rem' }}
+            >
+              Open Contacts
+            </button>
+            <h3>No conversation selected</h3>
+            <p>Select a friend from the list to start chatting.</p>
           </div>
         )}
       </section>

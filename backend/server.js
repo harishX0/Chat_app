@@ -15,6 +15,8 @@ const {
 const authRoutes = require("./routes/authRoutes");
 const messageRoutes = require("./routes/messageRoutes");
 const userRoutes = require("./routes/userRoutes");
+const friendRoutes = require("./routes/friendRoutes");
+const postRoutes = require("./routes/postRoutes");
 
 dotenv.config();
 connectDB();
@@ -63,7 +65,8 @@ app.set("onlineUsers", onlineUsers);
 
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
 app.get("/", (req, res) => {
   res.send("Backend is running");
@@ -83,6 +86,8 @@ app.get("/api/health", (req, res) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/messages", messageRoutes);
+app.use("/api/friends", friendRoutes);
+app.use("/api/posts", postRoutes);
 
 io.use((socket, next) => {
   try {

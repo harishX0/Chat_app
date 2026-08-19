@@ -60,7 +60,15 @@ export default function MessageComposer({
       {selectedImage && (
         <div className="image-preview-container">
           <img src={selectedImage} alt="Selected" className="image-preview" />
-          <button onClick={() => onImageSelect(null)} className="remove-image-btn" type="button">
+          <button 
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onImageSelect(null);
+            }} 
+            className="remove-image-btn" 
+            type="button"
+          >
             <X size={16} />
           </button>
         </div>
